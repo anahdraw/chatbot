@@ -2,54 +2,50 @@ import streamlit as st
 import requests
 import json
 
-# Fungsi untuk memanggil endpoint Langflow (diperbarui)
-def run_langflow_analysis(base_url, flow_id, bearer_token, company_names, openai_api_key=None):
+# --- KONFIGURASI HARDCODE ---
+# URL dasar dari aplikasi Langflow Anda di DataStax.
+# Ganti dengan URL Anda jika suatu saat berubah.
+LANGFLOW_BASE_URL = "https://api.langflow.astra.datastax.com/lf/115811d4-1b67-443e-b29a-5db8ec947ec6"
+
+# Fungsi untuk memanggil endpoint Langflow
+def run_langflow_analysis(flow_id, bearer_token, company_names, openai_api_key=None):
     """
-    Mengirim permintaan ke endpoint Langflow dengan URL yang dibangun secara dinamis.
+    Mengirim permintaan ke endpoint Langflow dengan URL dasar yang sudah ditentukan di dalam kode.
     """
-    # Membangun URL API yang benar
-    # Ini adalah format standar untuk Langflow di DataStax Astra
-    api_endpoint = f"{base_url.rstrip('/')}/api/v1/run/{flow_id}"
+    # Membangun URL API dari URL dasar yang di-hardcode dan Flow ID dari input pengguna
+    api_endpoint = f"{LANGFLOW_BASE_URL.rstrip('/')}/api/v1/run/{flow_id}"
 
     headers = {
         "Authorization": f"Bearer {bearer_token}",
         "Content-Type": "application/json"
     }
     
-    # Payload yang akan dikirim. Strukturnya harus sesuai dengan flow Anda di Langflow.
-    # Input utama dikirim melalui 'input_value'.
-    # Ganti 'ChatInput-...' jika komponen input di flow Anda punya ID yang spesifik.
+    # Payload yang dikirim ke Langflow. Sesuaikan 'input_value' jika perlu.
     payload = {
         "input_value": f"Lakukan riset pasar mendalam untuk perusahaan-perusahaan berikut: {', '.join(company_names)}. Berikan analisis tentang posisi pasar, kompetitor utama, kekuatan, kelemahan, dan potensi pertumbuhan mereka.",
         "output_type": "chat",
         "input_type": "chat",
         "tweaks": {
-            # Contoh jika Anda perlu menimpa parameter komponen di dalam flow:
-            # "OpenAI-XXXXX": {
-            #     "openai_api_key": openai_api_key
-            # }
+            # Anda bisa menambahkan tweak di sini jika flow Anda membutuhkannya
+            # Contoh: "OpenAI-XXXXX": {"openai_api_key": openai_api_key}
         }
     }
 
-    st.info(f"Mengirim permintaan ke URL: {api_endpoint}")
-    # st.json(payload) # Hapus komentar ini jika Anda ingin melihat payload yang dikirim untuk debugging
+    st.info(f"Mengirim permintaan ke Langflow...")
+    # Untuk debugging, Anda bisa menghapus komentar di baris berikut untuk melihat URL lengkapnya
+    # st.code(f"Endpoint URL: {api_endpoint}")
 
     try:
-        # Mengatur timeout yang lebih lama untuk proses LLM
         response = requests.post(api_endpoint, headers=headers, data=json.dumps(payload), timeout=300)
-        response.raise_for_status()  # Akan memunculkan error jika status code bukan 2xx (seperti 404, 500, dll.)
+        response.raise_for_status()
         
-        # Langflow biasanya mengembalikan hasil dalam format JSON tunggal, bukan streaming untuk endpoint ini
         result = response.json()
         
-        # Ekstrak pesan dari output. Strukturnya bisa berbeda, jadi ini perlu disesuaikan.
-        # Anda bisa menggunakan st.json(result) untuk melihat struktur lengkapnya saat pertama kali mencoba.
-        # Jalur umum: result -> outputs -> [0] -> outputs -> [0] -> results -> message -> data -> text
-        output = result.get("outputs", [{}])[0]
-        final_text = output.get("outputs", [{}])[0].get("results", {}).get("message", {}).get("data", {}).get("text", "")
+        # Ekstrak pesan dari output. Jalur ini mungkin perlu disesuaikan dengan struktur flow Anda.
+        final_text = result.get("outputs", [{}])[0].get("outputs", [{}])[0].get("results", {}).get("message", {}).get("data", {}).get("text", "")
         
         if not final_text:
-             st.warning("Berhasil terhubung, namun tidak ada teks yang bisa diekstrak dari respons. Mungkin struktur output flow Anda berbeda.")
+             st.warning("Berhasil terhubung, namun tidak ada teks yang bisa diekstrak dari respons. Silakan periksa struktur output flow Anda di Langflow.")
              st.write("Struktur Respons Mentah dari Langflow:")
              st.json(result)
 
@@ -57,7 +53,7 @@ def run_langflow_analysis(base_url, flow_id, bearer_token, company_names, openai
 
     except requests.exceptions.HTTPError as http_err:
         st.error(f"HTTP Error terjadi: {http_err}")
-        st.error(f"Response Body: {http_err.response.text}")
+        st.error(f"Pastikan Flow ID dan Bearer Token Anda sudah benar. Response: {http_err.response.text}")
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"Terjadi kesalahan saat menghubungi API Langflow: {e}")
@@ -66,7 +62,6 @@ def run_langflow_analysis(base_url, flow_id, bearer_token, company_names, openai
         st.error("Gagal mem-parsing respons dari Langflow. Respons bukan format JSON yang valid.")
         st.text(response.text)
         return None
-
 
 # --- UI Aplikasi Streamlit ---
 
@@ -77,16 +72,11 @@ st.markdown("Aplikasi ini menggunakan alur kerja (flow) dari Langflow untuk mela
 
 # Sidebar untuk konfigurasi
 with st.sidebar:
-    st.header("⚙️ Konfigurasi Koneksi Langflow")
-    langflow_base_url = st.text_input(
-        "URL Dasar Langflow",
-        placeholder="https://yourapp.datastax.com/...",
-        help="Salin URL dasar dari aplikasi Langflow Anda di DataStax. Contoh: https://api.langflow.astra.datastax.com/lf/115811d4-..."
-    )
+    st.header("⚙️ Konfigurasi Wajib")
     langflow_flow_id = st.text_input(
-        "ID Flow Langflow",
-        placeholder="5f371299-11e3-4175-b4ec-c980576bfd6b",
-        help="Salin ID unik dari flow yang ingin Anda gunakan."
+        "Langflow Flow ID",
+        placeholder="Masukkan ID unik dari flow Anda",
+        help="Salin ID unik dari flow yang ingin Anda gunakan dari URL Langflow."
     )
     langflow_bearer = st.text_input(
         "Langflow Bearer Token", 
@@ -120,17 +110,19 @@ manual_input = st.text_area(
 )
 
 if st.button("🚀 Lakukan Analisis Pasar", type="primary"):
-    final_companies = sorted(list(set(selected_companies + [c.strip() for c in manual_input.split(',') if c.strip()])))
+    # Menggabungkan dan membersihkan daftar perusahaan
+    manual_list = [c.strip() for c in manual_input.split(',') if c.strip()]
+    final_companies = sorted(list(set(selected_companies + manual_list)))
 
     # Validasi input
-    if not all([langflow_base_url, langflow_flow_id, langflow_bearer]):
-        st.warning("Harap lengkapi URL Dasar, ID Flow, dan Bearer Token di sidebar.")
+    if not all([langflow_flow_id, langflow_bearer]):
+        st.warning("Harap lengkapi Flow ID dan Bearer Token di sidebar.")
     elif not final_companies:
         st.warning("Harap pilih atau masukkan setidaknya satu nama perusahaan.")
     else:
         st.write(f"**Perusahaan yang akan dianalisis:** {', '.join(final_companies)}")
         with st.spinner("AI sedang melakukan riset pasar... Ini bisa memakan waktu beberapa saat."):
-            result = run_langflow_analysis(langflow_base_url, langflow_flow_id, langflow_bearer, final_companies, openai_api_key)
+            result = run_langflow_analysis(langflow_flow_id, langflow_bearer, final_companies, openai_api_key)
             
             if result:
                 st.subheader("✅ Hasil Analisis Riset Pasar")
