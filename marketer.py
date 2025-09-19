@@ -5,7 +5,7 @@ import json
 # --- KONFIGURASI HARDCODE ---
 # URL dasar dari aplikasi Langflow Anda di DataStax.
 # Ganti dengan URL Anda jika suatu saat berubah.
-LANGFLOW_BASE_URL = "https://api.langflow.astra.datastax.com/lf/115811d4-1b67-443e-b29a-5db8ec947ec6/api/v1/run/5f371299-11e3-4175-b4ec-c980576bfd6b"
+LANGFLOW_BASE_URL = ""
 
 # Fungsi untuk memanggil endpoint Langflow
 def run_langflow_analysis(flow_id, bearer_token, company_names, openai_api_key=None):
